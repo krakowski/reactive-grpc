@@ -33,27 +33,22 @@ public final class ClientCalls {
             Mono<TRequest> monoSource,
             BiConsumer<TRequest, StreamObserver<TResponse>> delegate) {
         try {
-            return Mono
-                    .<TResponse>create(emitter -> monoSource.subscribe(
-                        request -> delegate.accept(request, new StreamObserver<TResponse>() {
-                            @Override
-                            public void onNext(TResponse tResponse) {
-                                emitter.success(tResponse);
-                            }
+            return monoSource.flatMap(request -> Mono.create(callback -> delegate.accept(request, new StreamObserver<TResponse>() {
+                @Override
+                public void onNext(TResponse tResponse) {
+                    callback.success(tResponse);
+                }
 
-                            @Override
-                            public void onError(Throwable throwable) {
-                                emitter.error(throwable);
-                            }
+                @Override
+                public void onError(Throwable throwable) {
+                    callback.error(throwable);
+                }
 
-                            @Override
-                            public void onCompleted() {
-                                // Do nothing
-                            }
-                        }),
-                        emitter::error
-                    ))
-                    .transform(Operators.lift(new SubscribeOnlyOnceLifter<TResponse>()));
+                @Override
+                public void onCompleted() {
+                    // do nothing
+                }
+            })));
         } catch (Throwable throwable) {
             return Mono.error(throwable);
         }
